@@ -6,10 +6,10 @@ turtles-own
   weight1A                              ;; association between signaling A and world-state 1
   weight0B                              ;; association between signaling B and world-state 0
   weight1B                              ;; association between signaling B and world-state 1
-  signal_sent
   signal_recieved
   action_taken
-
+  action_history
+  signal_history
 ]
 
 links-own
@@ -19,6 +19,8 @@ links-own
 
 globals
 [
+  score                                ;; number of co
+  done                                 ;; checks for convergence
   clustering-coefficient               ;; the clustering coefficient of the network; this is the
                                        ;; average of clustering coefficients of all turtles
   average-path-length                  ;; average path length of the network
@@ -34,6 +36,7 @@ globals
   state                                ;; state of the world
   choice                               ;; choice of action - ideally is equal to state
   signal                               ;; signal sent
+  history                              ;; a history of previous states
 ]
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -72,11 +75,18 @@ to make-turtles
   ;; arrange them in a circle in order by who number
   layout-circle (sort turtles) max-pxcor - 1
   ask turtles [
-    set weight0A 5
-    set weight0B 5
-    set weight1A 5
-    set weight1B 5
+    set signal_history ""
+    reset-weights
   ]
+end
+
+to reset-weights
+  set weight0A 5
+  set weight0B 5
+  set weight1A 5
+  set weight1B 5
+  set size 1
+  set color gray
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -84,7 +94,6 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to rewire-one
-
   ;; make sure num-turtles is setup correctly else run setup first
   if count turtles != num-nodes [
     setup
@@ -419,49 +428,88 @@ end
 ;;;;;;;;;;;;;;;;
 to play
   set state random 2        ; state is held constant throughout tick - may change by placing line within ask turtles
-  ifelse state = 0
-  [ask patches [set pcolor black]]
-  [ask patches [set pcolor blue]]
+                            ;  ifelse state = 0
+                            ;  [ ask patches [ set pcolor black ] ]
+                            ;  [ ask patches [ set pcolor white ] ]
+  set history word history state
   ask turtles [
     set signal_recieved "-"
-    set action_taken "-"
-    observe-and-signal
-    ask one-of in-link-neighbors [
-      interpret
-      adjust
-    ]
-    adjust
-   ;forget
+    play-a-game
   ]
-  if all? turtles [ ( weight0A = 0 or weight1A = 0 ) and ( weight0B = 0 or weight1B = 0 ) ]
-  [ stop ]
+  ; end if turtles are deterministic or ten laps with only success
+  if ( all? turtles [ ( weight0A = 0 or weight1A = 0 ) and ( weight0B = 0 or weight1B = 0 ) ] ) or ( score = 20 * num-nodes )
+  [ set done 1
+    stop ]
   tick
 end
 
+to play-a-game
+  set action_taken "-"
+  observe-and-signal
+  ask one-of in-link-neighbors [
+    interpret
+    adjust
+  ]
+  adjust
+  if forgetting [ forget ]
+end
+
 to observe-and-signal
-    if state = 0 [
-      signal0
-    ]
-    if state = 1 [
-      signal1
-    ]
+  if state = 0 [
+    signal0
+  ]
+  if state = 1 [
+    signal1
+  ]
 end
 
 to signal0
-  ifelse random (weight0A + weight0B) < weight0A
-  [ set signal "A" ]
-  [ set signal "B" ]
+  let s random ( weight0A + weight0B )
+  ifelse s != 0
+  [
+    ifelse s < weight0A
+    [ set signal "A"
+      set signal_history word signal_history "A"
+    ]
+    [
+      set signal "B"
+      set signal_history word signal_history "B" ]
+  ]
+  [
+    ifelse random 2 = 0
+    [
+      set signal "A"
+      set signal_history word signal_history "A"
+    ]
+    [
+      set signal "B"
+      set signal_history word signal_history "B"
+    ]
+  ]
 end
 
 to signal1
-  ifelse random (weight1A + weight1B) < weight1A
+  let s random ( weight0A + weight0B )
+  ifelse s != 0
   [
-    set signal "A"
-    set signal_sent "A"
+    ifelse s < weight1A
+    [ set signal "A"
+      set signal_history word signal_history "A"
+    ]
+    [
+      set signal "B"
+      set signal_history word signal_history "B" ]
   ]
   [
-    set signal "B"
-    set signal_sent "B"
+    ifelse random 2 = 0
+    [
+      set signal "A"
+      set signal_history word signal_history "A"
+    ]
+    [
+      set signal "B"
+      set signal_history word signal_history "A"
+    ]
   ]
 end
 
@@ -471,39 +519,51 @@ to interpret
 end
 
 to interpretA
-  (ifelse
-    random (weight0A + weight1A) < weight0A [
-      set choice 0
-      set action_taken "0"
-      set signal_recieved "A"
+  set signal_recieved "A"
+  let s random ( weight0A + weight1A )
+  ifelse s != 0
+  [ ifelse random s < weight0A
+    [ choose-0 ]
+    [ choose-1 ]
   ]
-  [
-      set choice 1
-      set action_taken "1"
-      set signal_recieved "A"
-  ])
+  [ ifelse random 2 = 0
+    [ choose-0 ]
+    [ choose-1 ]
+  ]
 end
 
 to interpretB
-  ;set asked_to_interpret = "Y"
-  (ifelse
-    random (weight0B + weight1B) < weight0B [
-      set choice 0
-      set action_taken "0"
-      set signal_recieved "B"
+  set signal_recieved "B"
+  let s random ( weight0B + weight1B )
+  ifelse s != 0
+  [ ifelse random s < weight0B
+    [ choose-0 ]
+    [ choose-1 ]
   ]
-  [
-      set choice 1
-      set action_taken "1"
-      set signal_recieved "B"
-  ])
+  [ ifelse random 2 = 0
+    [ choose-0 ]
+    [ choose-1 ]
+  ]
+end
+
+to choose-0
+  set choice 0
+  set action_taken "0"
+  set action_history word action_history "0"
+end
+
+to choose-1
+  set choice 1
+  set action_taken "1"
+  set action_history word action_history "1"
 end
 
 to adjust
   set color green
   ;;if the correct action was chosen
   ifelse choice = state
-    [ if state = 0 [
+    [ set score score + 1
+      if state = 0 [
       ifelse signal = "A"
       [ set weight0A weight0A + 1 ]
       [ set weight0B weight0B + 1 ]
@@ -517,9 +577,12 @@ to adjust
 
   ;;if the wrong action was taken
   [
+    set score 0
     if state = 0 [
       ifelse signal = "A"
-      [ if weight0A > 0 [ set weight0A weight0A - 1 ] ]
+      [
+        if weight0A > 0 [ set weight0A weight0A - 1 ]
+      ]
       [ if weight0B > 0 [ set weight0B weight0B - 1 ] ]
     ]
     if state = 1 [
@@ -528,15 +591,23 @@ to adjust
       [ if weight1B > 0 [ set weight1B weight1B - 1 ] ]
     ]
   ]
+  update-aesthetics
+end
 
-  ;;update colours
+to update-aesthetics
   ;;RED means the node correlates world state 0 with message A
+  ;;BLUE means the node correlates world state 0 with message B
+  ;;YELLOW means the node has total weight 0 for either signal A or B
+  set size 1
   if weight0A + weight1B > weight1A + weight0B
   [ set color red ]
   if weight0A + weight1B < weight1A + weight0B
   [ set color blue ]
   if weight0A + weight1B = weight1A + weight0B
   [ set color gray ]
+  if ( weight0A + weight1A = 0 ) or ( weight0B + weight1B = 0 )
+  [ set color yellow
+    set size 4 ]
 end
 
 
@@ -548,12 +619,18 @@ to forget
     if weight1B > 0 [ set weight1B weight1B - 1 ]
   ]
 end
+
+to reveal-randoms
+  ifelse ( weight0A = 0 or weight1A = 0 ) and ( weight0B = 0 or weight1B = 0 )
+  [ set size 1 ]
+  [ set size 2 ]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 387
-52
+10
 805
-471
+429
 -1
 -1
 10.0
@@ -574,18 +651,18 @@ GRAPHICS-WINDOW
 0
 1
 ticks
-30.0
+10.0
 
 SLIDER
-27
-348
-186
-381
+42
+293
+201
+326
 num-nodes
 num-nodes
 1
 125
-10.0
+11.0
 1
 1
 NIL
@@ -628,15 +705,15 @@ NIL
 1
 
 SLIDER
-10
-405
-281
-438
+25
+350
+296
+383
 rewiring-probability
 rewiring-probability
 0
 1
-0.42
+0.94
 0.01
 1
 NIL
@@ -660,10 +737,10 @@ NIL
 1
 
 MONITOR
-345
-552
-771
-597
+838
+397
+1162
+442
 node properties
 highlight-string
 3
@@ -729,10 +806,10 @@ PENS
 "cc" 1.0 2 -13345367 true "" ";; note: dividing by initial value to normalize the plot\nplotxy rewiring-probability\n       clustering-coefficient / clustering-coefficient-of-lattice"
 
 BUTTON
-104
-172
-170
-205
+279
+167
+345
+200
 setup
 setup
 NIL
@@ -761,10 +838,10 @@ NIL
 HORIZONTAL
 
 BUTTON
-30
-81
-93
-114
+205
+76
+268
+109
 play
 play
 T
@@ -778,12 +855,12 @@ NIL
 1
 
 BUTTON
-27
-173
-93
-206
-forget
-ask turtles [\nset weight0A 5\nset weight0B 5\nset weight1A 5\nset weight1B 5\nset color gray\n]
+300
+121
+406
+154
+reset weights
+ask turtles [\nreset-weights\n]
 NIL
 1
 T
@@ -795,25 +872,25 @@ NIL
 1
 
 SLIDER
-170
-282
-342
-315
+51
+225
+223
+258
 memory
 memory
 0
 100
-13.0
+100.0
 1
 1
 NIL
 HORIZONTAL
 
 BUTTON
-30
-126
-115
-159
+205
+121
+290
+154
 play once
 play
 NIL
@@ -825,6 +902,34 @@ NIL
 NIL
 NIL
 1
+
+BUTTON
+131
+168
+275
+201
+clear graph and play
+reset-ticks\nset done 0\nask turtles [ reset-weights ]\nwhile [ done = 0 ] [ play ]
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+SWITCH
+21
+102
+132
+135
+forgetting
+forgetting
+0
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
