@@ -6,6 +6,10 @@ turtles-own
   weight1A                              ;; association between signaling A and world-state 1
   weight0B                              ;; association between signaling B and world-state 0
   weight1B                              ;; association between signaling B and world-state 1
+  signal_sent
+  signal_recieved
+  action_taken
+
 ]
 
 links-own
@@ -415,7 +419,12 @@ end
 ;;;;;;;;;;;;;;;;
 to play
   set state random 2        ; state is held constant throughout tick - may change by placing line within ask turtles
+  ifelse state = 0
+  [ask patches [set pcolor black]]
+  [ask patches [set pcolor blue]]
   ask turtles [
+    set signal_recieved "-"
+    set action_taken "-"
     observe-and-signal
     ask one-of in-link-neighbors [
       interpret
@@ -430,7 +439,7 @@ to play
 end
 
 to observe-and-signal
-      if state = 0 [
+    if state = 0 [
       signal0
     ]
     if state = 1 [
@@ -446,8 +455,14 @@ end
 
 to signal1
   ifelse random (weight1A + weight1B) < weight1A
-  [ set signal "A" ]
-  [ set signal "B" ]
+  [
+    set signal "A"
+    set signal_sent "A"
+  ]
+  [
+    set signal "B"
+    set signal_sent "B"
+  ]
 end
 
 to interpret
@@ -455,8 +470,38 @@ to interpret
   if ( signal = "B" ) [ interpretB ]
 end
 
+to interpretA
+  (ifelse
+    random (weight0A + weight1A) < weight0A [
+      set choice 0
+      set action_taken "0"
+      set signal_recieved "A"
+  ]
+  [
+      set choice 1
+      set action_taken "1"
+      set signal_recieved "A"
+  ])
+end
+
+to interpretB
+  ;set asked_to_interpret = "Y"
+  (ifelse
+    random (weight0B + weight1B) < weight0B [
+      set choice 0
+      set action_taken "0"
+      set signal_recieved "B"
+  ]
+  [
+      set choice 1
+      set action_taken "1"
+      set signal_recieved "B"
+  ])
+end
+
 to adjust
   set color green
+  ;;if the correct action was chosen
   ifelse choice = state
     [ if state = 0 [
       ifelse signal = "A"
@@ -469,6 +514,8 @@ to adjust
         [ set weight1B weight1B + 1 ]
       ]
   ]
+
+  ;;if the wrong action was taken
   [
     if state = 0 [
       ifelse signal = "A"
@@ -481,6 +528,9 @@ to adjust
       [ if weight1B > 0 [ set weight1B weight1B - 1 ] ]
     ]
   ]
+
+  ;;update colours
+  ;;RED means the node correlates world state 0 with message A
   if weight0A + weight1B > weight1A + weight0B
   [ set color red ]
   if weight0A + weight1B < weight1A + weight0B
@@ -489,17 +539,6 @@ to adjust
   [ set color gray ]
 end
 
-to interpretA
-  ifelse random (weight0A + weight1A) < weight0A
-  [ set choice 0 ]
-  [ set choice 1 ]
-end
-
-to interpretB
-  ifelse random (weight0B + weight1B) < weight0B
-  [ set choice 0 ]
-  [ set choice 1 ]
-end
 
 to forget
   if random memory = memory - 1 [
@@ -513,8 +552,8 @@ end
 GRAPHICS-WINDOW
 387
 52
-745
-411
+805
+471
 -1
 -1
 10.0
@@ -527,10 +566,10 @@ GRAPHICS-WINDOW
 0
 0
 1
--17
-17
--17
-17
+-20
+20
+-20
+20
 0
 0
 1
@@ -544,7 +583,7 @@ SLIDER
 381
 num-nodes
 num-nodes
-10
+1
 125
 10.0
 1
@@ -597,7 +636,7 @@ rewiring-probability
 rewiring-probability
 0
 1
-0.41
+0.42
 0.01
 1
 NIL
@@ -621,10 +660,10 @@ NIL
 1
 
 MONITOR
-387
-435
-813
-480
+345
+552
+771
+597
 node properties
 highlight-string
 3
@@ -764,7 +803,7 @@ memory
 memory
 0
 100
-18.0
+13.0
 1
 1
 NIL
