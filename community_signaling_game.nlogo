@@ -6,10 +6,11 @@ turtles-own
   weight1A                              ;; association between signaling A and world-state 1
   weight0B                              ;; association between signaling B and world-state 0
   weight1B                              ;; association between signaling B and world-state 1
-  signal_recieved
-  action_taken
+  ;signal_recieved
   action_history
-  signal_history
+  ;signal_history
+  signal_sent_history
+  signal_recieved_history
 ]
 
 links-own
@@ -75,16 +76,19 @@ to make-turtles
   ;; arrange them in a circle in order by who number
   layout-circle (sort turtles) max-pxcor - 1
   ask turtles [
-    set signal_history ""
+    ;set signal_history ""
+    set signal_sent_history ""
+    set signal_recieved_history ""
+    set action_history ""
     reset-weights
   ]
 end
 
 to reset-weights
-  set weight0A 5
-  set weight0B 5
-  set weight1A 5
-  set weight1B 5
+  set weight0A 50
+  set weight0B 50
+  set weight1A 50
+  set weight1B 50
   set size 1
   set color gray
 end
@@ -431,9 +435,10 @@ to play
                             ;  ifelse state = 0
                             ;  [ ask patches [ set pcolor black ] ]
                             ;  [ ask patches [ set pcolor white ] ]
+  ;output-write state
   set history word history state
   ask turtles [
-    set signal_recieved "-"
+    ;set signal_recieved "-"
     play-a-game
   ]
   ; end if turtles are deterministic or ten laps with only success
@@ -444,7 +449,6 @@ to play
 end
 
 to play-a-game
-  set action_taken "-"
   observe-and-signal
   ask one-of in-link-neighbors [
     interpret
@@ -469,21 +473,21 @@ to signal0
   [
     ifelse s < weight0A
     [ set signal "A"
-      set signal_history word signal_history "A"
+      set signal_sent_history word signal_sent_history "A"
     ]
     [
       set signal "B"
-      set signal_history word signal_history "B" ]
+      set signal_sent_history word signal_sent_history "B" ]
   ]
   [
     ifelse random 2 = 0
     [
       set signal "A"
-      set signal_history word signal_history "A"
+      set signal_sent_history word signal_sent_history "A"
     ]
     [
       set signal "B"
-      set signal_history word signal_history "B"
+      set signal_sent_history word signal_sent_history "B"
     ]
   ]
 end
@@ -494,21 +498,21 @@ to signal1
   [
     ifelse s < weight1A
     [ set signal "A"
-      set signal_history word signal_history "A"
+      set signal_sent_history word signal_sent_history "A"
     ]
     [
       set signal "B"
-      set signal_history word signal_history "B" ]
+      set signal_sent_history word signal_sent_history "B" ]
   ]
   [
     ifelse random 2 = 0
     [
       set signal "A"
-      set signal_history word signal_history "A"
+      set signal_sent_history word signal_sent_history "A"
     ]
     [
       set signal "B"
-      set signal_history word signal_history "A"
+      set signal_sent_history word signal_sent_history "B"
     ]
   ]
 end
@@ -519,10 +523,15 @@ to interpret
 end
 
 to interpretA
-  set signal_recieved "A"
+  set signal_recieved_history word signal_recieved_history "A"
   let s random ( weight0A + weight1A )
+;  output-write "( s = "
+;  output-write s
+;  output-write "and weight0A = "
+;  output-write weight0A
+;  output-write ")"
   ifelse s != 0
-  [ ifelse random s < weight0A
+  [ ifelse s < weight0A
     [ choose-0 ]
     [ choose-1 ]
   ]
@@ -533,10 +542,10 @@ to interpretA
 end
 
 to interpretB
-  set signal_recieved "B"
+  set signal_recieved_history word signal_recieved_history "B"
   let s random ( weight0B + weight1B )
   ifelse s != 0
-  [ ifelse random s < weight0B
+  [ ifelse s < weight0B
     [ choose-0 ]
     [ choose-1 ]
   ]
@@ -548,13 +557,11 @@ end
 
 to choose-0
   set choice 0
-  set action_taken "0"
   set action_history word action_history "0"
 end
 
 to choose-1
   set choice 1
-  set action_taken "1"
   set action_history word action_history "1"
 end
 
@@ -578,14 +585,12 @@ to adjust
   ;;if the wrong action was taken
   [
     set score 0
-    if state = 0 [
+    if choice = 0 [
       ifelse signal = "A"
-      [
-        if weight0A > 0 [ set weight0A weight0A - 1 ]
-      ]
+      [ if weight0A > 0 [ set weight0A weight0A - 1 ] ]
       [ if weight0B > 0 [ set weight0B weight0B - 1 ] ]
     ]
-    if state = 1 [
+    if choice = 1 [
       ifelse signal = "A"
       [ if weight1A > 0 [ set weight1A weight1A - 1 ] ]
       [ if weight1B > 0 [ set weight1B weight1B - 1 ] ]
@@ -662,7 +667,7 @@ num-nodes
 num-nodes
 1
 125
-11.0
+2.0
 1
 1
 NIL
@@ -927,9 +932,16 @@ SWITCH
 135
 forgetting
 forgetting
-0
+1
 1
 -1000
+
+OUTPUT
+35
+468
+1166
+589
+12
 
 @#$#@#$#@
 ## WHAT IS IT?
